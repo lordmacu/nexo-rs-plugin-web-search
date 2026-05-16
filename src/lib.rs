@@ -14,4 +14,16 @@
 //! private to that agent. Tools accept optional `instance:` arg
 //! (mirrors google's `account:` arg).
 
-// Module roots land in subsequent Phase 5 steps.
+pub mod auto_discovery;
+pub mod cli;
+pub mod env_config;
+pub mod plugin;
+pub mod runtime_handle;
+pub mod tools;
+
+pub use plugin::{
+    CacheConfig, ProviderEntry, ProvidersConfig, WebSearchConfigFile, WebSearchInstance,
+    WebSearchPlugin,
+};
+
+pub use cli::{Cli, Command};

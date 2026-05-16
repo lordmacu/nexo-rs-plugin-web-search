@@ -2547,9 +2547,9 @@ dependencies = [
 
 [[package]]
 name = "nexo-microapp-sdk"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f865c4f7dfc3d0a73f0fee0ab27c9b76a9160eac70ef1da4fc67d2f0440efbf"
+checksum = "33ee76d7ab3ff410eac484fc5c2ad2c3562d64c96e8764e20eb727202e8dcf65"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
