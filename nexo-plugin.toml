@@ -1,0 +1,136 @@
+# Phase 95 — out-of-tree standalone subprocess plugin.
+#
+# Bundled into the binary at compile-time via
+# `include_str!("../nexo-plugin.toml")` in `src/main.rs`. Daemon's
+# discovery walker invokes `nexo-plugin-web-search --print-manifest`
+# to register the plugin without spawning the JSON-RPC loop.
+#
+# Multi-instance × multi-agent: operators declare N "search
+# profiles" in `web-search.yaml::instances[]`. Each instance has its
+# own provider set + cache + default_order. Instances without
+# `agent_id` are shared (default profile); instances with `agent_id`
+# are private to that agent. Mirrors google plugin v0.2.1 pattern.
+
+manifest_version = 2
+
+[plugin]
+id               = "web_search"
+version          = "0.1.0"
+name             = "Web Search"
+description      = "Multi-provider web search (Brave / Tavily / DuckDuckGo / Perplexity) for Nexo agents."
+min_nexo_version = ">=0.1.19"
+
+[plugin.entrypoint]
+command = "nexo-plugin-web-search"
+
+[plugin.requires]
+nexo_capabilities = ["broker"]
+
+# Defense-in-depth: the plugin only handles topics it owns. Daemon
+# rejects subscribe attempts outside this allowlist.
+[plugin.capabilities.broker]
+subscribe = [
+    "plugin.outbound.web_search",
+    "plugin.outbound.web_search.>",
+    "plugin.web_search.admin.>",
+    "plugin.web_search.metrics.scrape",
+]
+publish = []
+
+# Per-plugin tool namespace allowlist. Tool names this plugin
+# advertises at initialize-reply MUST match.
+[plugin.tools]
+expose = ["web_search"]
+
+# Daemon registers one `RemoteToolHandler` per tool here at boot.
+# The handler routes `tool.invoke` JSON-RPC over stdio with
+# `params.policy` stamped from `EffectiveBindingPolicy::for_tool`
+# (Phase 95 framework contract). Tool description + JSON-Schema
+# ship via the initialize-reply (`PluginAdapter::declare_tools`).
+[plugin.extends]
+tools = ["web_search"]
+
+# Phase 81.33.b.real Stage 4 — admin RPC commands forwarded via
+# broker. Daemon receives `nexo/admin/web_search/<verb>` from
+# operators + forwards to `plugin.web_search.admin.<verb>`.
+[plugin.admin]
+method_prefix       = "nexo/admin/web_search/"
+broker_topic_prefix = "plugin.web_search.admin"
+timeout_seconds     = 15
+
+# Phase 81.33.b.real Stage 5 — Prometheus metrics scrape via
+# broker. Replaces the legacy in-process direct call from the
+# daemon's `run_metrics_server` to
+# `nexo_web_search::telemetry::render`.
+[plugin.metrics]
+prometheus          = true
+broker_topic_prefix = "plugin.web_search"
+timeout_seconds     = 5
+
+# Phase 93.4 — declarative config contract. Daemon delivers
+# operator YAML at `<config_dir>/plugins/web-search.yaml` via
+# `plugin.configure` JSON-RPC; SDK `on_configure` handler
+# deserialises into `WebSearchConfigFile`.
+#
+# Multi-instance shape — `instances:[]` array. Each entry can be
+# either shared (no `agent_id`) or private (specific `agent_id`).
+[plugin.config_schema]
+shape  = "object"
+schema = '''{
+  "type": "object",
+  "properties": {
+    "instances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id":       { "type": "string", "description": "Unique identifier across instances[]." },
+          "agent_id": { "type": "string", "description": "Optional. When absent, the instance is shared across all agents (default profile). When present, only that agent may use the instance." },
+          "providers": {
+            "type": "object",
+            "properties": {
+              "brave":      { "type": "object", "properties": { "api_key_path": {"type":"string"}, "timeout_ms": {"type":"integer","minimum":1,"maximum":60000} } },
+              "tavily":     { "type": "object", "properties": { "api_key_path": {"type":"string"}, "timeout_ms": {"type":"integer","minimum":1,"maximum":60000} } },
+              "perplexity": { "type": "object", "properties": { "api_key_path": {"type":"string"}, "timeout_ms": {"type":"integer","minimum":1,"maximum":60000} } },
+              "duckduckgo": { "type": "object", "properties": { "timeout_ms":   {"type":"integer","minimum":1,"maximum":60000} } }
+            }
+          },
+          "cache": {
+            "type": "object",
+            "properties": {
+              "enabled":  { "type": "boolean" },
+              "path":     { "type": "string" },
+              "ttl_secs": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "default_order": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["brave","tavily","perplexity","duckduckgo"] }
+          }
+        },
+        "required": ["id", "providers"]
+      }
+    }
+  },
+  "required": ["instances"]
+}'''
+
+# Phase 94 v0.2.1 — credential store opt-out. Web-search API keys
+# live as file paths inside `web-search.yaml::instances[].providers`;
+# the plugin reads them directly via `SecretSources`-style lazy
+# refresh inside `nexo-web-search`. The generic
+# `RemoteCredentialStore` indirection would just add JSON-RPC
+# round-trips without value.
+[plugin.credentials_schema]
+enabled = false
+
+# Setup wizard dashboard. Multi-instance × multi-agent: the wizard
+# walks per-instance subdirs of the workspace and probes API-key
+# files inside.
+[plugin.dashboard.layout]
+kind   = "workspace_walk"
+subdir = "web_search"
+
+[plugin.dashboard.auth_check]
+kind       = "session_dir_files"
+candidates = ["brave_api_key.txt", "tavily_api_key.txt", "perplexity_api_key.txt"]
