@@ -2143,9 +2143,9 @@ dependencies = [
 
 [[package]]
 name = "nexo-core"
-version = "0.1.19"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95b03aab5b4713ae1e78b72c93370c515c9f0622e4aae2e69cd8a92339928d27"
+checksum = "755d7ce93000af0b0a153175c2b40e2fc9e2a16d0344997025b4700ddcc6744a"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2184,7 +2184,6 @@ dependencies = [
  "nexo-taskflow",
  "nexo-team-store",
  "nexo-tool-meta",
- "nexo-web-search",
  "notify",
  "notify-debouncer-full",
  "regex",

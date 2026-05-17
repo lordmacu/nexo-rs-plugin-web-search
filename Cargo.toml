@@ -51,7 +51,7 @@ perplexity = ["nexo-web-search/perplexity"]
 # `ToolInvocation.policy` field needed by Phase 95.
 nexo-microapp-sdk    = { version = "0.1.19", features = ["plugin"] }
 nexo-broker          = "0.1.5"
-nexo-core            = "0.1.19"
+nexo-core            = "0.2"
 nexo-config          = "0.1.9"
 nexo-plugin-manifest = "0.1.6"
 nexo-resilience      = "0.1.3"
