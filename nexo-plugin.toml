@@ -15,7 +15,7 @@ manifest_version = 2
 
 [plugin]
 id               = "web_search"
-version          = "0.1.0"
+version          = "0.1.1"
 name             = "Web Search"
 description      = "Multi-provider web search (Brave / Tavily / DuckDuckGo / Perplexity) for Nexo agents."
 min_nexo_version = ">=0.1.19"

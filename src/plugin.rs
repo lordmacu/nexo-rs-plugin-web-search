@@ -45,7 +45,7 @@ use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use nexo_web_search::{
-    providers::duckduckgo::DuckDuckGoProvider, WebSearchArgs, WebSearchCache,
+    providers::duckduckgo::DuckDuckGoProvider, ProviderState, WebSearchArgs, WebSearchCache,
     WebSearchProvider, WebSearchResult, WebSearchRouter,
 };
 use serde::{Deserialize, Serialize};
@@ -127,11 +127,20 @@ fn default_cache_ttl() -> u64 {
     600
 }
 
+/// Phase 95 FU#1 — per-instance bundle tracked separately so
+/// admin RPCs can reach the cache + router directly (the lib's
+/// `WebSearchRouter` doesn't expose its inner cache).
+struct InstanceState {
+    router: Arc<WebSearchRouter>,
+    cache: Option<Arc<WebSearchCache>>,
+}
+
 /// Process-wide state.
 pub struct WebSearchPlugin {
-    /// instance_id → router. Each instance has its own provider
-    /// set + cache + default_order. One process, many profiles.
-    instances: DashMap<String, Arc<WebSearchRouter>>,
+    /// instance_id → bundle (router + cache handle). Each instance
+    /// has its own provider set + cache + default_order. One
+    /// process, many profiles.
+    instances: DashMap<String, Arc<InstanceState>>,
     /// agent_id → ordered list of private instance_ids. First
     /// entry is the agent's default profile.
     by_agent: DashMap<String, Vec<String>>,
@@ -198,15 +207,15 @@ impl WebSearchPlugin {
             }
         }
 
-        let next_instances: DashMap<String, Arc<WebSearchRouter>> = DashMap::new();
+        let next_instances: DashMap<String, Arc<InstanceState>> = DashMap::new();
         let next_by_agent: DashMap<String, Vec<String>> = DashMap::new();
         let mut next_shared: Vec<String> = Vec::new();
 
         for inst in &file.instances {
-            let router = build_router(inst).await.with_context(|| {
+            let bundle = build_instance(inst).await.with_context(|| {
                 format!("building router for instance `{}`", inst.id)
             })?;
-            next_instances.insert(inst.id.clone(), router);
+            next_instances.insert(inst.id.clone(), Arc::new(bundle));
             match &inst.agent_id {
                 Some(agent) => {
                     next_by_agent
@@ -267,8 +276,12 @@ impl WebSearchPlugin {
     pub fn router_for(&self, instance_id: &str) -> Result<Arc<WebSearchRouter>> {
         self.instances
             .get(instance_id)
-            .map(|r| Arc::clone(r.value()))
+            .map(|r| Arc::clone(&r.value().router))
             .ok_or_else(|| anyhow!("instance `{instance_id}` is not configured"))
+    }
+
+    fn bundle_for(&self, instance_id: &str) -> Option<Arc<InstanceState>> {
+        self.instances.get(instance_id).map(|r| Arc::clone(r.value()))
     }
 
     pub fn instances_for_agent(&self, agent_id: &str) -> Vec<String> {
@@ -349,38 +362,102 @@ impl WebSearchPlugin {
 
     // ── Admin handlers ──────────────────────────────────────────
 
-    pub async fn admin_cache_stats(&self, _instance: Option<&str>) -> Result<Value> {
-        // nexo-web-search's WebSearchCache doesn't expose per-entry
-        // stats counters in v0.1.2; placeholder reports configured
-        // instances + which have caches enabled. v0.2.0 follow-up:
-        // surface hit/miss counts from telemetry registry.
+    /// Phase 95 FU#1 (0.1.1) — per-instance entry counts via
+    /// `WebSearchCache::stats()` (nexo-web-search 0.2.0).
+    pub async fn admin_cache_stats(&self, instance: Option<&str>) -> Result<Value> {
         let mut stats: Vec<Value> = Vec::new();
-        for entry in self.instances.iter() {
-            stats.push(json!({
-                "instance": entry.key(),
-                "cache_enabled": true,  // see follow-up — actual flag lives in inst config
-            }));
+        let ids: Vec<String> = match instance {
+            Some(name) => vec![name.to_string()],
+            None => self.instances.iter().map(|e| e.key().clone()).collect(),
+        };
+        for id in ids {
+            let Some(bundle) = self.bundle_for(&id) else {
+                stats.push(json!({
+                    "instance": id,
+                    "ok": false,
+                    "error": "instance not configured",
+                }));
+                continue;
+            };
+            match bundle.cache.as_ref() {
+                Some(cache) => match cache.stats().await {
+                    Ok(s) => stats.push(json!({
+                        "instance": id,
+                        "ok": true,
+                        "entries": s.entries,
+                    })),
+                    Err(e) => stats.push(json!({
+                        "instance": id,
+                        "ok": false,
+                        "error": format!("{e}"),
+                    })),
+                },
+                None => stats.push(json!({
+                    "instance": id,
+                    "ok": true,
+                    "cache_enabled": false,
+                })),
+            }
         }
         Ok(json!({ "instances": stats }))
     }
 
-    pub async fn admin_cache_clear(&self, _instance: Option<&str>) -> Result<Value> {
-        // Placeholder: clearing a WebSearchCache requires a method
-        // on nexo-web-search that doesn't exist yet. Follow-up.
-        Ok(json!({
-            "ok": false,
-            "error": "cache clear not implemented in nexo-web-search 0.1.2; follow-up"
-        }))
+    /// Phase 95 FU#1 (0.1.1) — flush cache via
+    /// `WebSearchCache::clear()` (nexo-web-search 0.2.0). When
+    /// `instance` is `None`, clears every configured instance's
+    /// cache; reports per-instance row counts deleted.
+    pub async fn admin_cache_clear(&self, instance: Option<&str>) -> Result<Value> {
+        let mut cleared: Vec<Value> = Vec::new();
+        let ids: Vec<String> = match instance {
+            Some(name) => vec![name.to_string()],
+            None => self.instances.iter().map(|e| e.key().clone()).collect(),
+        };
+        for id in ids {
+            let Some(bundle) = self.bundle_for(&id) else {
+                cleared.push(json!({
+                    "instance": id,
+                    "ok": false,
+                    "error": "instance not configured",
+                }));
+                continue;
+            };
+            match bundle.cache.as_ref() {
+                Some(cache) => match cache.clear().await {
+                    Ok(rows) => cleared.push(json!({
+                        "instance": id,
+                        "ok": true,
+                        "rows_deleted": rows,
+                    })),
+                    Err(e) => cleared.push(json!({
+                        "instance": id,
+                        "ok": false,
+                        "error": format!("{e}"),
+                    })),
+                },
+                None => cleared.push(json!({
+                    "instance": id,
+                    "ok": true,
+                    "cache_enabled": false,
+                    "rows_deleted": 0,
+                })),
+            }
+        }
+        Ok(json!({ "instances": cleared }))
     }
 
+    /// Phase 95 FU#1 (0.1.1) — per-provider operational state via
+    /// `WebSearchRouter::provider_states()` (nexo-web-search 0.2.0).
+    /// Reports each instance's providers + their current circuit-
+    /// breaker availability. `available: false` means the
+    /// provider's breaker is open (recent failures); the router
+    /// will skip it on the next call.
     pub async fn admin_provider_status(&self) -> Result<Value> {
-        // Lists configured instances + their declared default_order.
-        // Per-provider breaker state lives inside the router crate
-        // (not exposed); follow-up enhancement.
         let mut out: Vec<Value> = Vec::with_capacity(self.instances.len());
         for entry in self.instances.iter() {
+            let states: Vec<ProviderState> = entry.value().router.provider_states();
             out.push(json!({
                 "instance": entry.key(),
+                "providers": states,
             }));
         }
         Ok(json!({ "instances": out }))
@@ -406,11 +483,8 @@ impl WebSearchPlugin {
     }
 }
 
-/// Build a single `WebSearchRouter` for the given instance,
-/// reading API key files at load time. SecretSources-style lazy
-/// refresh lives inside each provider's HTTP layer (the lib
-/// already supports it via per-call file mtime checks).
-async fn build_router(inst: &WebSearchInstance) -> Result<Arc<WebSearchRouter>> {
+/// Build a single instance bundle (router + cache handle).
+async fn build_instance(inst: &WebSearchInstance) -> Result<InstanceState> {
     let providers = build_providers(&inst.providers).await?;
     if providers.is_empty() {
         return Err(anyhow!(
@@ -432,7 +506,8 @@ async fn build_router(inst: &WebSearchInstance) -> Result<Arc<WebSearchRouter>> 
     } else {
         None
     };
-    Ok(Arc::new(WebSearchRouter::new(providers, cache)))
+    let router = Arc::new(WebSearchRouter::new(providers, cache.clone()));
+    Ok(InstanceState { router, cache })
 }
 
 async fn build_providers(

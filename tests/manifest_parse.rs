@@ -11,7 +11,7 @@ fn manifest_parses_as_v2() {
         toml::from_str(MANIFEST).expect("nexo-plugin.toml parses as PluginManifest");
     assert_eq!(parsed.manifest_version, 2);
     assert_eq!(parsed.plugin.id, "web_search");
-    assert_eq!(parsed.plugin.version.to_string(), "0.1.0");
+    assert_eq!(parsed.plugin.version.to_string(), "0.1.1");
 }
 
 #[test]

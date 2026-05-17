@@ -2616,7 +2616,7 @@ dependencies = [
 
 [[package]]
 name = "nexo-plugin-web-search"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2730,9 +2730,9 @@ dependencies = [
 
 [[package]]
 name = "nexo-web-search"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f812c5fa04fa2936115f4049a353f9f784ccc09533798d9c68e7cbe7479579c"
+checksum = "d66c5c0fae3983c84d598adb8f219a38bc9e34f459e8d21f1cbd3602500d9f6f"
 dependencies = [
  "async-trait",
  "chrono",
