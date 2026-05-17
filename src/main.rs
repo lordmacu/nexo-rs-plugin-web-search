@@ -158,9 +158,8 @@ async fn dispatch_tool(
                 Err(ToolInvocationError::Denied(msg))
             } else if msg.contains("no configured web_search instance")
                 || msg.contains("not configured")
+                || msg.contains("breaker open")
             {
-                Err(ToolInvocationError::Unavailable(msg))
-            } else if msg.contains("breaker open") {
                 Err(ToolInvocationError::Unavailable(msg))
             } else if msg.contains("requires `query`")
                 || msg.contains("web_search args:")
