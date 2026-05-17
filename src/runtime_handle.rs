@@ -11,8 +11,7 @@ use tokio::sync::RwLock;
 
 use crate::plugin::WebSearchPlugin;
 
-static HANDLE: Lazy<RwLock<Option<Arc<WebSearchPlugin>>>> =
-    Lazy::new(|| RwLock::new(None));
+static HANDLE: Lazy<RwLock<Option<Arc<WebSearchPlugin>>>> = Lazy::new(|| RwLock::new(None));
 
 pub fn runtime_handle() -> &'static RwLock<Option<Arc<WebSearchPlugin>>> {
     &HANDLE

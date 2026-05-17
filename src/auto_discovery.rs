@@ -17,10 +17,7 @@ async fn current_plugin() -> Option<Arc<WebSearchPlugin>> {
 }
 
 pub async fn admin_handle(request: &Value) -> Value {
-    let method = request
-        .get("method")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let method = request.get("method").and_then(|v| v.as_str()).unwrap_or("");
     let params = request.get("params").cloned().unwrap_or(Value::Null);
 
     let Some(plugin) = current_plugin().await else {
@@ -58,12 +55,10 @@ pub async fn admin_handle(request: &Value) -> Value {
             }
         }
 
-        "nexo/admin/web_search/provider_status" => {
-            match plugin.admin_provider_status().await {
-                Ok(v) => json!({ "ok": true, "result": v }),
-                Err(e) => json!({ "ok": false, "error": format!("{e}") }),
-            }
-        }
+        "nexo/admin/web_search/provider_status" => match plugin.admin_provider_status().await {
+            Ok(v) => json!({ "ok": true, "result": v }),
+            Err(e) => json!({ "ok": false, "error": format!("{e}") }),
+        },
 
         "nexo/admin/web_search/list_instances" => match plugin.admin_list_instances().await {
             Ok(v) => json!({ "ok": true, "result": v }),
@@ -89,7 +84,9 @@ pub async fn metrics_scrape(_request: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugin::{ProviderEntry, ProvidersConfig, WebSearchConfigFile, WebSearchInstance, CacheConfig};
+    use crate::plugin::{
+        CacheConfig, ProviderEntry, ProvidersConfig, WebSearchConfigFile, WebSearchInstance,
+    };
     use serial_test::serial;
 
     async fn boot_one_shared() -> Arc<WebSearchPlugin> {

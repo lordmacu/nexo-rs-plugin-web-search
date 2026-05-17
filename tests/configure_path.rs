@@ -4,7 +4,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use nexo_plugin_web_search::plugin::{
-    CacheConfig, ProviderEntry, ProvidersConfig, WebSearchConfigFile, WebSearchInstance, WebSearchPlugin,
+    CacheConfig, ProviderEntry, ProvidersConfig, WebSearchConfigFile, WebSearchInstance,
+    WebSearchPlugin,
 };
 
 fn brave_only(id: &str, agent: Option<&str>, dir: &Path) -> WebSearchInstance {
@@ -32,7 +33,9 @@ fn brave_only(id: &str, agent: Option<&str>, dir: &Path) -> WebSearchInstance {
 #[tokio::test]
 async fn empty_instances_yields_empty_state() {
     let p = Arc::new(WebSearchPlugin::new());
-    p.on_configure(WebSearchConfigFile::default()).await.unwrap();
+    p.on_configure(WebSearchConfigFile::default())
+        .await
+        .unwrap();
     assert_eq!(p.instance_count(), 0);
     assert_eq!(p.agent_count(), 0);
     assert_eq!(p.shared_count(), 0);

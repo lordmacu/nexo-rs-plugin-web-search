@@ -183,8 +183,7 @@ impl WebSearchPlugin {
     /// corrupt each other.
     pub async fn on_configure(&self, file: WebSearchConfigFile) -> Result<()> {
         // Pre-flight: instance ids unique + cache paths unique.
-        let mut seen_ids: std::collections::HashSet<&str> =
-            std::collections::HashSet::new();
+        let mut seen_ids: std::collections::HashSet<&str> = std::collections::HashSet::new();
         let mut seen_cache_paths: std::collections::HashSet<&std::path::Path> =
             std::collections::HashSet::new();
         for inst in &file.instances {
@@ -212,9 +211,9 @@ impl WebSearchPlugin {
         let mut next_shared: Vec<String> = Vec::new();
 
         for inst in &file.instances {
-            let bundle = build_instance(inst).await.with_context(|| {
-                format!("building router for instance `{}`", inst.id)
-            })?;
+            let bundle = build_instance(inst)
+                .await
+                .with_context(|| format!("building router for instance `{}`", inst.id))?;
             next_instances.insert(inst.id.clone(), Arc::new(bundle));
             match &inst.agent_id {
                 Some(agent) => {
@@ -281,7 +280,9 @@ impl WebSearchPlugin {
     }
 
     fn bundle_for(&self, instance_id: &str) -> Option<Arc<InstanceState>> {
-        self.instances.get(instance_id).map(|r| Arc::clone(r.value()))
+        self.instances
+            .get(instance_id)
+            .map(|r| Arc::clone(r.value()))
     }
 
     pub fn instances_for_agent(&self, agent_id: &str) -> Vec<String> {
@@ -308,17 +309,15 @@ impl WebSearchPlugin {
         // Per-binding policy gate.
         if let Some(p) = policy {
             if p.get("enabled").and_then(|v| v.as_bool()) == Some(false) {
-                return Err(anyhow!(
-                    "web_search disabled by policy on this binding"
-                ));
+                return Err(anyhow!("web_search disabled by policy on this binding"));
             }
         }
 
         let instance_id = self.resolve_instance(&args, agent_id)?;
         let router = self.router_for(&instance_id)?;
 
-        let mut search_args: WebSearchArgs = serde_json::from_value(args.clone())
-            .map_err(|e| anyhow!("web_search args: {e}"))?;
+        let mut search_args: WebSearchArgs =
+            serde_json::from_value(args.clone()).map_err(|e| anyhow!("web_search args: {e}"))?;
 
         // Apply policy defaults when LLM omitted fields.
         if let Some(p) = policy {
@@ -464,14 +463,9 @@ impl WebSearchPlugin {
     }
 
     pub async fn admin_list_instances(&self) -> Result<Value> {
-        let mut instances: Vec<String> = self
-            .instances
-            .iter()
-            .map(|e| e.key().clone())
-            .collect();
+        let mut instances: Vec<String> = self.instances.iter().map(|e| e.key().clone()).collect();
         instances.sort();
-        let mut by_agent: serde_json::Map<String, Value> =
-            serde_json::Map::new();
+        let mut by_agent: serde_json::Map<String, Value> = serde_json::Map::new();
         for entry in self.by_agent.iter() {
             by_agent.insert(entry.key().clone(), json!(entry.value()));
         }
@@ -510,9 +504,7 @@ async fn build_instance(inst: &WebSearchInstance) -> Result<InstanceState> {
     Ok(InstanceState { router, cache })
 }
 
-async fn build_providers(
-    cfg: &ProvidersConfig,
-) -> Result<Vec<Arc<dyn WebSearchProvider>>> {
+async fn build_providers(cfg: &ProvidersConfig) -> Result<Vec<Arc<dyn WebSearchProvider>>> {
     let mut out: Vec<Arc<dyn WebSearchProvider>> = Vec::new();
 
     if let Some(entry) = cfg.brave.as_ref() {
@@ -565,9 +557,9 @@ async fn read_api_key(entry: &ProviderEntry) -> Result<Option<String>> {
     let Some(path) = entry.api_key_path.as_ref() else {
         return Ok(None);
     };
-    let raw = tokio::fs::read_to_string(path).await.with_context(|| {
-        format!("reading API key file at {}", path.display())
-    })?;
+    let raw = tokio::fs::read_to_string(path)
+        .await
+        .with_context(|| format!("reading API key file at {}", path.display()))?;
     let trimmed = raw.trim().to_string();
     if trimmed.is_empty() {
         Ok(None)
@@ -580,7 +572,11 @@ async fn read_api_key(entry: &ProviderEntry) -> Result<Option<String>> {
 mod tests {
     use super::*;
 
-    fn brave_only_instance(id: &str, agent: Option<&str>, dir: &std::path::Path) -> WebSearchInstance {
+    fn brave_only_instance(
+        id: &str,
+        agent: Option<&str>,
+        dir: &std::path::Path,
+    ) -> WebSearchInstance {
         let key_path = dir.join(format!("{id}_brave.txt"));
         std::fs::write(&key_path, "test-brave-key").unwrap();
         WebSearchInstance {
@@ -605,7 +601,9 @@ mod tests {
     #[tokio::test]
     async fn on_configure_empty_yields_empty_state() {
         let p = WebSearchPlugin::new();
-        p.on_configure(WebSearchConfigFile::default()).await.unwrap();
+        p.on_configure(WebSearchConfigFile::default())
+            .await
+            .unwrap();
         assert_eq!(p.instance_count(), 0);
         assert_eq!(p.agent_count(), 0);
         assert_eq!(p.shared_count(), 0);
@@ -778,7 +776,9 @@ mod tests {
     async fn resolve_instance_errors_when_nothing_configured() {
         let p = WebSearchPlugin::new();
         let err = p.resolve_instance(&json!({}), "bob").unwrap_err();
-        assert!(err.to_string().contains("no configured web_search instance"));
+        assert!(err
+            .to_string()
+            .contains("no configured web_search instance"));
     }
 
     #[tokio::test]
@@ -827,10 +827,7 @@ mod tests {
         let listing = p.admin_list_instances().await.unwrap();
         let instances = listing["instances"].as_array().unwrap();
         assert_eq!(instances.len(), 2);
-        assert_eq!(
-            listing["shared"].as_array().unwrap()[0],
-            json!("default")
-        );
+        assert_eq!(listing["shared"].as_array().unwrap()[0], json!("default"));
         assert_eq!(
             listing["by_agent"]["ana"].as_array().unwrap()[0],
             json!("ana_research")

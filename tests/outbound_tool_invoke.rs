@@ -4,7 +4,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use nexo_plugin_web_search::plugin::{
-    CacheConfig, ProviderEntry, ProvidersConfig, WebSearchConfigFile, WebSearchInstance, WebSearchPlugin,
+    CacheConfig, ProviderEntry, ProvidersConfig, WebSearchConfigFile, WebSearchInstance,
+    WebSearchPlugin,
 };
 use serde_json::json;
 
@@ -86,12 +87,7 @@ async fn missing_query_errors() {
 async fn empty_query_errors_from_router() {
     let (p, _dir) = boot_shared().await;
     let err = p
-        .invoke_outbound_tool(
-            "web_search",
-            json!({"query": "   "}),
-            "ana",
-            None,
-        )
+        .invoke_outbound_tool("web_search", json!({"query": "   "}), "ana", None)
         .await
         .unwrap_err();
     assert!(
@@ -113,7 +109,9 @@ async fn unknown_agent_with_no_shared_errors() {
         .invoke_outbound_tool("web_search", json!({"query": "x"}), "bob", None)
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("no configured web_search instance"));
+    assert!(err
+        .to_string()
+        .contains("no configured web_search instance"));
 }
 
 #[tokio::test]

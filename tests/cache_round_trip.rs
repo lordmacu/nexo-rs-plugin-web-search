@@ -5,7 +5,8 @@
 use std::sync::Arc;
 
 use nexo_plugin_web_search::plugin::{
-    CacheConfig, ProviderEntry, ProvidersConfig, WebSearchConfigFile, WebSearchInstance, WebSearchPlugin,
+    CacheConfig, ProviderEntry, ProvidersConfig, WebSearchConfigFile, WebSearchInstance,
+    WebSearchPlugin,
 };
 
 fn brave_with_cache(

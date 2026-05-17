@@ -140,12 +140,11 @@ async fn dispatch_tool(
     plugin: Arc<WebSearchPlugin>,
     inv: ToolInvocation,
 ) -> Result<Value, ToolInvocationError> {
-    let agent_id = inv
-        .agent_id
-        .as_deref()
-        .ok_or_else(|| ToolInvocationError::ArgumentInvalid(
+    let agent_id = inv.agent_id.as_deref().ok_or_else(|| {
+        ToolInvocationError::ArgumentInvalid(
             "tool.invoke is missing `agent_id` (daemon must include it)".into(),
-        ))?;
+        )
+    })?;
     match plugin
         .invoke_outbound_tool(&inv.tool_name, inv.args, agent_id, inv.policy.as_ref())
         .await
@@ -176,12 +175,16 @@ async fn dispatch_tool(
 }
 
 fn spawn_auto_discovery_subscribers(broker: AnyBroker) {
-    spawn_one(broker.clone(), "plugin.web_search.admin.>", |_b, payload| async move {
-        auto_discovery::admin_handle(&payload).await
-    });
-    spawn_one(broker, "plugin.web_search.metrics.scrape", |_b, payload| async move {
-        auto_discovery::metrics_scrape(&payload).await
-    });
+    spawn_one(
+        broker.clone(),
+        "plugin.web_search.admin.>",
+        |_b, payload| async move { auto_discovery::admin_handle(&payload).await },
+    );
+    spawn_one(
+        broker,
+        "plugin.web_search.metrics.scrape",
+        |_b, payload| async move { auto_discovery::metrics_scrape(&payload).await },
+    );
 }
 
 fn spawn_one<F, Fut>(broker: AnyBroker, topic: &'static str, handler: F)
