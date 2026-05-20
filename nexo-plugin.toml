@@ -134,3 +134,34 @@ subdir = "web_search"
 [plugin.dashboard.auth_check]
 kind       = "session_dir_files"
 candidates = ["brave_api_key.txt", "tavily_api_key.txt", "perplexity_api_key.txt"]
+
+# ────────────────────────────────────────────────────────────────
+# Phase 99 — admin UI contribution (Mode A, declarative).
+# Web-search config is purely the `instances[]` array (per-instance
+# providers / cache / order), so the screen exposes it as a single
+# `json` field — the daemon synthesises the value from current
+# config + validates a save against `[plugin.config_schema]`. Per-
+# provider API keys live as file paths inside instances (read via
+# the credential pipeline), not edited here. Needs manifest >= 0.1.8.
+# ────────────────────────────────────────────────────────────────
+[plugin.admin_ui]
+schema_version = 1
+mode           = "declarative"
+describe       = false
+
+[[plugin.admin_ui.contributions]]
+id     = "web-search"
+slot   = "plugin.web_search.root"
+label  = "Web Search"
+icon   = "search"
+order  = 1000
+screen = "settings"
+
+[[plugin.admin_ui.screens]]
+id    = "settings"
+title = "Web Search Settings"
+
+[[plugin.admin_ui.screens.fields]]
+key   = "instances"
+type  = "json"
+label = "Instances (providers, cache, default order)"
