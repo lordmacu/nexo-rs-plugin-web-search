@@ -12,7 +12,7 @@
 
 [package]
 name         = "nexo-plugin-web-search"
-version      = "0.1.1"
+version      = "0.1.2"
 description  = "Multi-provider web search (Brave / Tavily / DuckDuckGo / Perplexity) tool plugin for Nexo agents (out-of-tree subprocess)."
 edition      = "2021"
 license      = "MIT OR Apache-2.0"
